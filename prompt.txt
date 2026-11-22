@@ -1,0 +1,8 @@
+Read SPEC.md in this project. Implement the full mobile app exactly as specified.
+This is an Expo project using Expo Router, so screens belong in src/app/.
+Check package.json for the exact Expo SDK version and write code for that version.
+Create all necessary files, components, and navigation. Make sure that appropriate data is persistent.
+Avoid security risks for sensitive data.  Include proper error handling.
+Make sure the app starts without errors and displays the home screen correctly.
+
+
