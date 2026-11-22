@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 export type JournalEntry = {
   id: string;
@@ -21,9 +22,11 @@ type AppDataContextValue = {
   dailyEntry: JournalEntry | null;
   isLoading: boolean;
   loadError: string | null;
+  isMutating: boolean;
   addEntry: (title: string, reflection: string) => Promise<JournalEntry>;
   toggleFavorite: (id: string) => Promise<void>;
   addManifestation: (text: string) => Promise<void>;
+  updateManifestation: (id: string, text: string) => Promise<void>;
 };
 
 const JOURNAL_KEY = '@daily_journal_entries';
@@ -61,15 +64,127 @@ function createId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function isJournalEntry(value: unknown): value is JournalEntry {
+  if (!value || typeof value !== 'object') return false;
+  const entry = value as Record<string, unknown>;
+  return (
+    typeof entry.id === 'string'
+    && typeof entry.title === 'string'
+    && typeof entry.reflection === 'string'
+    && typeof entry.createdAt === 'string'
+    && !Number.isNaN(Date.parse(entry.createdAt))
+    && typeof entry.isFavorite === 'boolean'
+  );
+}
+
+function isManifestation(value: unknown): value is Manifestation {
+  if (!value || typeof value !== 'object') return false;
+  const manifestation = value as Record<string, unknown>;
+  return (
+    typeof manifestation.id === 'string'
+    && typeof manifestation.text === 'string'
+    && typeof manifestation.year === 'number'
+    && Number.isInteger(manifestation.year)
+  );
+}
+
+function parseCollection<T>(stored: string | null, validator: (value: unknown) => value is T): T[] {
+  if (!stored) return [];
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed.filter(validator) : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseDailySelection(stored: string | null): { date: string; id: string } | null {
+  if (!stored) return null;
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    if (
+      parsed
+      && typeof parsed === 'object'
+      && typeof (parsed as Record<string, unknown>).date === 'string'
+      && typeof (parsed as Record<string, unknown>).id === 'string'
+    ) {
+      return parsed as { date: string; id: string };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [manifestations, setManifestations] = useState<Manifestation[]>([]);
   const [dailyEntry, setDailyEntry] = useState<JournalEntry | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isMutating, setIsMutating] = useState(false);
+  const entriesRef = useRef<JournalEntry[]>([]);
+  const manifestationsRef = useRef<Manifestation[]>([]);
+  const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingMutationsRef = useRef(0);
+
+  const runMutation = async <T,>(mutation: () => Promise<T>): Promise<T> => {
+    pendingMutationsRef.current += 1;
+    setIsMutating(true);
+
+    const task = mutationQueueRef.current
+      .catch(() => undefined)
+      .then(mutation);
+    mutationQueueRef.current = task.then(
+      () => undefined,
+      () => undefined,
+    );
+
+    try {
+      return await task;
+    } finally {
+      pendingMutationsRef.current -= 1;
+      if (pendingMutationsRef.current === 0) setIsMutating(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
+
+    const refreshDailySelection = async () => {
+      const today = localDateKey();
+      const currentEntries = entriesRef.current;
+
+      try {
+        const storedDaily = await AsyncStorage.getItem(DAILY_KEY);
+        const selection = parseDailySelection(storedDaily);
+
+        if (!active) return;
+
+        if (currentEntries.length === 0) {
+          setDailyEntry(null);
+          await AsyncStorage.removeItem(DAILY_KEY);
+          return;
+        }
+
+        if (selection?.date === today) {
+          const existing = currentEntries.find((entry) => entry.id === selection?.id);
+          if (existing) {
+            setDailyEntry(existing);
+            return;
+          }
+        }
+
+        const chosen = chooseDailyEntry(currentEntries, today);
+        setDailyEntry(chosen);
+        await AsyncStorage.setItem(
+          DAILY_KEY,
+          JSON.stringify({ date: today, id: chosen?.id }),
+        );
+      } catch {
+        if (active) setLoadError('Could not load your saved reflections.');
+      }
+    };
 
     async function load() {
       try {
@@ -79,19 +194,17 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(DAILY_KEY),
         ]);
 
-        const nextEntries: JournalEntry[] = storedEntries ? JSON.parse(storedEntries) : [];
-        const nextManifestations: Manifestation[] = storedManifestations
-          ? JSON.parse(storedManifestations)
-          : [];
+        const nextEntries = parseCollection(storedEntries, isJournalEntry);
+        const nextManifestations = parseCollection(storedManifestations, isManifestation);
 
         if (!active) return;
+        entriesRef.current = nextEntries;
+        manifestationsRef.current = nextManifestations;
         setEntries(nextEntries);
         setManifestations(nextManifestations);
 
         const today = localDateKey();
-        let selection: { date: string; id: string } | null = storedDaily
-          ? JSON.parse(storedDaily)
-          : null;
+        const selection = parseDailySelection(storedDaily);
 
         if (selection?.date === today) {
           const existing = nextEntries.find((entry) => entry.id === selection?.id);
@@ -127,8 +240,18 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     }
 
     void load();
+
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') void refreshDailySelection();
+    });
+    const midnightCheck = setInterval(() => {
+      void refreshDailySelection();
+    }, 60 * 1000);
+
     return () => {
       active = false;
+      appStateSubscription.remove();
+      clearInterval(midnightCheck);
     };
   }, []);
 
@@ -137,42 +260,76 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addEntry = async (title: string, reflection: string) => {
+    const trimmedTitle = title.trim();
+    const trimmedReflection = reflection.trim();
+    if (!trimmedTitle || !trimmedReflection) {
+      throw new Error('Both a title and reflection are required');
+    }
+
     const entry: JournalEntry = {
       id: createId('entry'),
-      title: title.trim(),
-      reflection: reflection.trim(),
+      title: trimmedTitle,
+      reflection: trimmedReflection,
       createdAt: new Date().toISOString(),
       isFavorite: false,
     };
-    const nextEntries = [entry, ...entries];
-    await persistEntries(nextEntries);
-    setEntries(nextEntries);
 
-    if (!dailyEntry) {
-      const today = localDateKey();
-      setDailyEntry(entry);
-      await AsyncStorage.setItem(DAILY_KEY, JSON.stringify({ date: today, id: entry.id }));
-    }
-    return entry;
+    return runMutation(async () => {
+      const nextEntries = [entry, ...entriesRef.current];
+      await persistEntries(nextEntries);
+      entriesRef.current = nextEntries;
+      setEntries(nextEntries);
+
+      if (!dailyEntry) {
+        const today = localDateKey();
+        setDailyEntry(entry);
+        await AsyncStorage.setItem(DAILY_KEY, JSON.stringify({ date: today, id: entry.id }));
+      }
+      return entry;
+    });
   };
 
   const toggleFavorite = async (id: string) => {
-    const nextEntries = entries.map((entry) =>
-      entry.id === id ? { ...entry, isFavorite: !entry.isFavorite } : entry,
-    );
-    await persistEntries(nextEntries);
-    setEntries(nextEntries);
+    await runMutation(async () => {
+      const nextEntries = entriesRef.current.map((entry) =>
+        entry.id === id ? { ...entry, isFavorite: !entry.isFavorite } : entry,
+      );
+      await persistEntries(nextEntries);
+      entriesRef.current = nextEntries;
+      setEntries(nextEntries);
+    });
   };
 
   const addManifestation = async (text: string) => {
+    const trimmedText = text.trim();
+    if (!trimmedText) throw new Error('A manifestation is required');
+
     const manifestation: Manifestation = {
       id: createId('goal'),
-      text: text.trim(),
+      text: trimmedText,
       year: new Date().getFullYear(),
     };
-    const nextManifestations = [manifestation, ...manifestations];
-    await AsyncStorage.setItem(MANIFESTATIONS_KEY, JSON.stringify(nextManifestations));
-    setManifestations(nextManifestations);
+
+    await runMutation(async () => {
+      const nextManifestations = [manifestation, ...manifestationsRef.current];
+      await AsyncStorage.setItem(MANIFESTATIONS_KEY, JSON.stringify(nextManifestations));
+      manifestationsRef.current = nextManifestations;
+      setManifestations(nextManifestations);
+    });
+  };
+
+  const updateManifestation = async (id: string, text: string) => {
+    const trimmedText = text.trim();
+    if (!trimmedText) throw new Error('A manifestation is required');
+
+    await runMutation(async () => {
+      const nextManifestations = manifestationsRef.current.map((manifestation) =>
+        manifestation.id === id ? { ...manifestation, text: trimmedText } : manifestation,
+      );
+      await AsyncStorage.setItem(MANIFESTATIONS_KEY, JSON.stringify(nextManifestations));
+      manifestationsRef.current = nextManifestations;
+      setManifestations(nextManifestations);
+    });
   };
 
   const value = {
@@ -181,9 +338,11 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     dailyEntry,
     isLoading,
     loadError,
+    isMutating,
     addEntry,
     toggleFavorite,
     addManifestation,
+    updateManifestation,
   };
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

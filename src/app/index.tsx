@@ -4,9 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppData } from '@/storage/AppDataContext';
 
+const PASTEL_ENTRY_BORDERS = ['#CDBBE8', '#F1BED1', '#F3C6A8', '#BFDCCB', '#BAD8EC', '#E7C5D9'];
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { entries, dailyEntry, isLoading, loadError, toggleFavorite } = useAppData();
+  const { entries, dailyEntry, isLoading, loadError, isMutating, toggleFavorite } = useAppData();
 
   const sortedEntries = [...entries].sort((a, b) => {
     if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
@@ -33,7 +35,7 @@ export default function HomeScreen() {
 
       {isLoading ? (
         <View style={styles.emptyCard}>
-          <ActivityIndicator color="#667A70" />
+          <ActivityIndicator color="#7456A8" />
         </View>
       ) : dailyEntry ? (
         <Pressable
@@ -65,8 +67,10 @@ export default function HomeScreen() {
           <Text style={styles.firstEntryButtonText}>+ Add your first reflection</Text>
         </Pressable>
       ) : (
-        sortedEntries.map((entry) => (
-          <View key={entry.id} style={styles.entryCard}>
+        sortedEntries.map((entry, index) => (
+          <View
+            key={entry.id}
+            style={[styles.entryCard, { borderColor: PASTEL_ENTRY_BORDERS[index % PASTEL_ENTRY_BORDERS.length], borderWidth: 2 }]}>
             <Pressable
               accessibilityRole="button"
               onPress={() => router.push({ pathname: '/journal', params: { id: entry.id } })}
@@ -85,6 +89,7 @@ export default function HomeScreen() {
               accessibilityRole="button"
               accessibilityLabel={entry.isFavorite ? 'Unfavorite entry' : 'Favorite entry'}
               onPress={() => void toggleFavorite(entry.id)}
+              disabled={isMutating}
               hitSlop={10}
               style={styles.starButton}>
               <Text style={[styles.star, entry.isFavorite && styles.starFavorite]}>
@@ -106,35 +111,35 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F7F5F0' },
+  screen: { flex: 1, backgroundColor: '#F8F6FA' },
   content: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 40 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
-  eyebrow: { color: '#8A918C', fontSize: 11, fontWeight: '700', letterSpacing: 1.4, marginBottom: 4 },
-  heading: { color: '#2F3834', fontSize: 26, fontWeight: '700' },
-  goalButton: { backgroundColor: '#E3EAE5', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 9 },
-  goalButtonText: { color: '#53675D', fontWeight: '700', fontSize: 12 },
-  inspirationCard: { backgroundColor: '#DCE6DE', borderRadius: 22, paddingHorizontal: 24, paddingVertical: 22, marginBottom: 28 },
-  quoteMark: { color: '#91A79A', fontFamily: 'serif', fontSize: 42, lineHeight: 42 },
-  inspirationTitle: { color: '#35443C', fontFamily: 'serif', fontSize: 22, lineHeight: 30, marginBottom: 16 },
-  readLink: { color: '#667A70', fontSize: 13, fontWeight: '700' },
-  emptyCard: { backgroundColor: '#EAE4DA', borderRadius: 22, padding: 24, marginBottom: 28, minHeight: 150, justifyContent: 'center' },
-  emptyTitle: { color: '#4A514D', fontFamily: 'serif', fontSize: 20, marginBottom: 8 },
-  emptyText: { color: '#777D79', lineHeight: 21 },
+  eyebrow: { color: '#91879B', fontSize: 11, fontWeight: '700', letterSpacing: 1.4, marginBottom: 4 },
+  heading: { color: '#352F3D', fontSize: 26, fontWeight: '700' },
+  goalButton: { backgroundColor: '#EAE4F3', borderRadius: 18, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: '#CDBBE8' },
+  goalButtonText: { color: '#7456A8', fontWeight: '700', fontSize: 12 },
+  inspirationCard: { backgroundColor: '#ECE5F6', borderRadius: 22, paddingHorizontal: 24, paddingVertical: 22, marginBottom: 28, borderWidth: 1, borderColor: '#DDD0EC' },
+  quoteMark: { color: '#B49BCF', fontFamily: 'serif', fontSize: 42, lineHeight: 42 },
+  inspirationTitle: { color: '#4A3D5D', fontFamily: 'serif', fontSize: 22, lineHeight: 30, marginBottom: 16 },
+  readLink: { color: '#7456A8', fontSize: 13, fontWeight: '700' },
+  emptyCard: { backgroundColor: '#F1EDF5', borderRadius: 22, padding: 24, marginBottom: 28, minHeight: 150, justifyContent: 'center', borderWidth: 1, borderColor: '#E2D9EA' },
+  emptyTitle: { color: '#4A4252', fontFamily: 'serif', fontSize: 20, marginBottom: 8 },
+  emptyText: { color: '#77717F', lineHeight: 21 },
   error: { color: '#A44F4F', marginBottom: 12 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  sectionTitle: { color: '#2F3834', fontSize: 18, fontWeight: '700' },
-  entryCount: { color: '#8A918C', backgroundColor: '#EAE7DF', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 3, overflow: 'hidden' },
-  entryCard: { backgroundColor: '#FFFFFF', borderRadius: 16, marginBottom: 10, flexDirection: 'row', borderWidth: 1, borderColor: '#ECE8DF' },
+  sectionTitle: { color: '#352F3D', fontSize: 18, fontWeight: '700' },
+  entryCount: { color: '#91879B', backgroundColor: '#EAE4F3', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 3, overflow: 'hidden' },
+  entryCard: { backgroundColor: '#FFFFFF', borderRadius: 16, marginBottom: 10, flexDirection: 'row', borderWidth: 1, borderColor: '#E1D7EB' },
   entryMain: { flex: 1, padding: 16 },
-  entryTitle: { color: '#343B38', fontSize: 16, fontWeight: '700', marginBottom: 5 },
-  entryReflection: { color: '#747A76', lineHeight: 20, marginBottom: 8 },
-  entryDate: { color: '#9A9D99', fontSize: 12 },
+  entryTitle: { color: '#403847', fontSize: 16, fontWeight: '700', marginBottom: 5 },
+  entryReflection: { color: '#77717F', lineHeight: 20, marginBottom: 8 },
+  entryDate: { color: '#958D9C', fontSize: 12 },
   starButton: { width: 54, alignItems: 'center', justifyContent: 'center' },
-  star: { color: '#A8ADA8', fontSize: 25 },
-  starFavorite: { color: '#C69A55' },
-  firstEntryButton: { borderWidth: 1, borderColor: '#D9D5CB', borderRadius: 16, alignItems: 'center', padding: 18 },
-  firstEntryButtonText: { color: '#667A70', fontWeight: '700' },
-  addButton: { backgroundColor: '#667A70', borderRadius: 16, alignItems: 'center', paddingVertical: 16, marginTop: 12 },
+  star: { color: '#A99DB2', fontSize: 25 },
+  starFavorite: { color: '#7456A8' },
+  firstEntryButton: { borderWidth: 2, borderColor: '#F1BED1', borderRadius: 16, alignItems: 'center', padding: 18 },
+  firstEntryButtonText: { color: '#7456A8', fontWeight: '700' },
+  addButton: { backgroundColor: '#7456A8', borderRadius: 16, alignItems: 'center', paddingVertical: 16, marginTop: 12, borderWidth: 2, borderColor: '#7456A8' },
   addButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   pressed: { opacity: 0.72 },
 });

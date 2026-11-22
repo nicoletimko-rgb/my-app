@@ -1,8 +1,51 @@
-Read SPEC.md in this project. Implement the full mobile app exactly as specified.
+MODEL: Copilot ChatGPT
+
+1. Can you explain how index.tsx works in Expo? Explain the basics to me and also answer these questions: "I'm brand new to React Native. Can you explain at a high level how these files create a working app?"
+"What's the difference between React Native and a regular website? How is a View different from a div?"
+"How do I add a button and a text input to a React Native screen? Show me a simple example and explain the useState hook."
+"This project uses Expo Router. How does a file in src/app/ become a screen, and what is _layout.tsx for?"
+
+2. Read SPEC.md in this project. Implement the full mobile app exactly as specified.
 This is an Expo project using Expo Router, so screens belong in src/app/.
 Check package.json for the exact Expo SDK version and write code for that version.
 Create all necessary files, components, and navigation. Make sure that appropriate data is persistent.
 Avoid security risks for sensitive data.  Include proper error handling.
 Make sure the app starts without errors and displays the home screen correctly.
 
+3. Review the React Native/Expo code in this project against the spec in SPEC.md.
+For each acceptance criterion in the spec, verify whether the code actually implements it correctly.
+Also check for:
+- Bugs or logic errors
+- Missing error handling
+- Code quality issues (unclear naming, repeated code, etc.)
+- Best practices for React Native or other technologies
+
+Format your review as a numbered list of findings, each marked as [PASS], [FAIL], or [WARN].
+Be specific. Reference file names and line numbers.
+Do not fix anything in this session. Report only.
+Export the review as REVIEW.md at the root of the project.
+
+4. I am going to ask you questions about REVIEW.md. simply EXPLAIN to me, do not change any code. Questions: 1) what does 1 and 2 mean in simple terms (and how would this hypothetically be fixed) 2) for 3 would this ever happen? 3) for 16, where in the layout is there a dark navigation theme?
+
+5. I am going to ask you questions about REVIEW.md. simply EXPLAIN to me, do not change any code. Questions: 1) what does 17, 18, and 19 mean in simple terms?
+
+6. is 19 and 2 not the same? for 17, what buttons are not clearly described? for 3 would i ever have a faulty write or old app version storing a different data shape?
+
+7. how do you fix the double press warnings/ issues? what is an accessibility role/ label? 
+
+8. are these labels or roles needed for functionality?
+
+9. can you show me what your PROPOSED changes to fix 1,2,3, 19 are? do not change just yet, just show me how much code you would change for each
+
+10. can you make all these fixes and summarize them to me. Also, for 16: take out option to do a dark theme.
+
+11. can you explain the fixes in simple language
+
+12. can you add an edit manifestiation ability
+
+13. Can you change color scheme to purple and neutral backgrounds and pastel borders and accents
+
+14. do the same on the manifestation page. Only do colored borders for boxes with white fill. if the box has a purple fill, do a shade of purple as the border
+
+15. make "save goal", "save reflection", and "new entry" button outlines the same color as the button fill
 
